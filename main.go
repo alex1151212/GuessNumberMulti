@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -87,7 +87,6 @@ func (manager *ClientManager) start() {
 		}
 	}
 }
-
 func (manager *ClientManager) send(message []byte, ignore *Client) {
 	for conn := range manager.clients {
 
@@ -119,7 +118,18 @@ func (c *Client) read() {
 			break
 		}
 
-		if c.isMyTurn {
+		messageToStr := string(message)
+		strSplit := strings.Split(messageToStr, "")
+		isValid := true
+		for _, str := range strSplit {
+			_, err := strconv.Atoi(str)
+
+			if err != nil {
+				isValid = false
+			}
+		}
+
+		if c.isMyTurn && isValid {
 			for client := range manager.clients {
 				if client == c {
 					client.isMyTurn = false
@@ -135,9 +145,13 @@ func (c *Client) read() {
 
 					jsonMessage, _ := json.Marshal(&Message{Content: "/A User guess your number is: " + string(message)})
 					manager.send(jsonMessage, c)
+					jsonMessage, _ = json.Marshal(&Message{Content: "/A It's your turn. "})
+					manager.send(jsonMessage, c)
 				}
 			}
-
+		} else if c.isMyTurn {
+			jsonMessage, _ := json.Marshal(&Message{Content: "/A Your guess number is not valid: " + string(message)})
+			manager.sendMeSelf(jsonMessage, c)
 		} else {
 			jsonMessage, _ := json.Marshal(&Message{Content: "/A Its not your turn "})
 			manager.sendMeSelf(jsonMessage, c)
@@ -210,19 +224,6 @@ func wsHandler(c *gin.Context) {
 	go client.write()
 }
 
-func LocalIp() string {
-	address, _ := net.InterfaceAddrs()
-	var ip = "localhost"
-	for _, address := range address {
-		if ipAddress, ok := address.(*net.IPNet); ok && !ipAddress.IP.IsLoopback() {
-			if ipAddress.IP.To4() != nil {
-				ip = ipAddress.IP.String()
-			}
-		}
-	}
-	return ip
-}
-
 func gameResponse(number string, c *Client) string {
 	var answer map[string]string = make(map[string]string)
 	var a, b int
@@ -235,7 +236,6 @@ func gameResponse(number string, c *Client) string {
 			}
 		}
 	}
-	fmt.Println(answer)
 	strNumberList := strings.Split(number, "")
 
 	for index, item := range strNumberList {
