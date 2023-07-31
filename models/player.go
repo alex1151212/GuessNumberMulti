@@ -1,7 +1,9 @@
 package models
 
 import (
-	"fmt"
+	"gin-practice/utils"
+	"strconv"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
@@ -18,69 +20,70 @@ type Player struct {
 	// 2. mutex加鎖
 }
 
-func (c *Player) Read() {
+func (player *Player) Read(gameServer *GameServer) {
 	defer func() {
-		_ = c.Socket.Close()
+		_ = player.Socket.Close()
 	}()
 	for {
-		_, message, err := c.Socket.ReadMessage()
+		_, message, err := player.Socket.ReadMessage()
 		if err != nil {
-			// manager.unregister <- c
-			_ = c.Socket.Close()
+			gameServer.Unregister <- player
+			_ = player.Socket.Close()
 			break
 		}
-		fmt.Println(message)
-		//		messageToStr := string(message)
-		//		strSplit := strings.Split(messageToStr, "")
-		//		isValid := true
-		//		for _, str := range strSplit {
-		//			_, err := strconv.Atoi(str)
-		//			if err != nil {
-		//				isValid = false
-		//			}
-		//		}
-		//		if c.isMyTurn && isValid {
-		//			for client := range manager.clients {
-		//				if client == c {
-		//					client.isMyTurn = false
-		//					res := gameResponse(string(message), c)
-		//					jsonMessage, _ := json.Marshal(&Message{Content: "/A Your guess number is: " + string(message)})
-		//					manager.SendMySelf(jsonMessage, c)
-		//					jsonMessage, _ = json.Marshal(&Message{Content: "/A Response: " + res})
-		//					manager.SendMySelf(jsonMessage, c)
-		//				} else {
-		//					client.isMyTurn = true
-		//					jsonMessage, _ := json.Marshal(&Message{Content: "/A User guess your number is: " + string(message)})
-		//					manager.send(jsonMessage, c)
-		//					jsonMessage, _ = json.Marshal(&Message{Content: "/A It's your turn. "})
-		//					manager.send(jsonMessage, c)
-		//				}
-		//			}
-		//		} else if c.isMyTurn {
-		//			jsonMessage, _ := json.Marshal(&Message{Content: "/A Your guess number is not valid: " + string(message)})
-		//			manager.SendMySelf(jsonMessage, c)
-		//		} else {
-		//			jsonMessage, _ := json.Marshal(&Message{Content: "/A Its not your turn "})
-		//			manager.SendMySelf(jsonMessage, c)
-		//		}
+
+		read(player, gameServer, message)
+
 	}
 }
 
-func (c *Player) Write() {
+// 傳送訊息給玩家
+func (player *Player) Write(gameServer *GameServer) {
 	defer func() {
-		_ = c.Socket.Close()
+		_ = player.Socket.Close()
 	}()
 
 	for {
 		select {
-		case message, ok := <-c.Send:
+		case message, ok := <-player.Send:
 			if !ok {
-				_ = c.Socket.WriteMessage(websocket.CloseMessage, []byte{})
+				_ = player.Socket.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
-			_ = c.Socket.WriteMessage(websocket.TextMessage, message)
+			_ = player.Socket.WriteMessage(websocket.TextMessage, message)
 
 		}
+	}
+}
+
+func read(myself *Player, gameServer *GameServer, message []byte) {
+	game := gameServer.Game
+	messageToStr := string(message)
+	strSplit := strings.Split(messageToStr, "")
+	isValid := true
+	for _, str := range strSplit {
+		_, err := strconv.Atoi(str)
+		if err != nil {
+			isValid = false
+		}
+	}
+	if game.CurrentTurn == myself && isValid {
+		for _, player := range game.Players {
+			if player == myself {
+				res := game.gameResponse(string(message), myself)
+				gameServer.SendGamePlayer(utils.FormatToJson("Your guess number is: "+string(message)), myself)
+				gameServer.SendGamePlayer(utils.FormatToJson("Response: "+res), myself)
+			} else {
+				gameServer.SendGamePlayer(utils.FormatToJson("User guess your number is: "+string(message)), player)
+				gameServer.SendGamePlayer(utils.FormatToJson("It's your turn. "+string(message)), player)
+				game.CurrentTurn = player
+			}
+
+		}
+	} else if !isValid {
+		gameServer.SendGamePlayer(utils.FormatToJson("Your guess number is not valid: "+string(message)), myself)
+	} else {
+		gameServer.SendGamePlayer(utils.FormatToJson("Its not your turn. "), myself)
 	}
 }
