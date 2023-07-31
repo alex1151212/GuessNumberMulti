@@ -8,6 +8,7 @@ import (
 )
 
 type Game struct {
+	Id          uint
 	Players     []*Player
 	CurrentTurn *Player
 }

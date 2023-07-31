@@ -2,7 +2,6 @@ package services
 
 import (
 	"gin-practice/models"
-	"gin-practice/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,15 +10,17 @@ import (
 )
 
 var gameServer = models.GameServer{
-	Game: &models.Game{
-		Players:     make([]*models.Player, 0),
-		CurrentTurn: nil,
-	},
+	Game:       make(map[string]*models.Game),
 	Broadcast:  make(chan []byte),
 	Register:   make(chan *models.Player),
 	Unregister: make(chan *models.Player),
-	Players:    make(map[*models.Player]bool),
+	Players:    make(map[string]*models.Player),
 }
+
+// &models.Game{
+// 	Players:     make([]*models.Player, 0),
+// 	CurrentTurn: nil,
+// }
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024 * 1024 * 1024,
@@ -30,44 +31,8 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func Init() {
-	for {
-		select {
-		case conn := <-gameServer.Register:
-
-			gameServer.Players[conn] = true
-
-			gameServer.SendPlayers(utils.FormatToJson("A new socket has connected. "), conn)
-
-			// 暫時邏輯 若gameserver 人數大於2 則創建遊戲
-			if len(gameServer.Game.Players) < 2 {
-				gameServer.Game.Players = append(gameServer.Game.Players, conn)
-			}
-
-			if len(gameServer.Game.Players) == 2 {
-				gameServer.Game.Init()
-			}
-
-		case conn := <-gameServer.Unregister:
-
-			if _, ok := gameServer.Players[conn]; ok {
-				close(conn.Send)
-				delete(gameServer.Players, conn)
-				gameServer.SendGamePlayers(utils.FormatToJson("socket has disconnected. "), conn)
-			}
-
-		case message := <-gameServer.Broadcast:
-
-			for conn := range gameServer.Players {
-				select {
-				case conn.Send <- message:
-				default:
-					close(conn.Send)
-					delete(gameServer.Players, conn)
-				}
-			}
-		}
-	}
+func GameServerStart() {
+	gameServer.Init()
 }
 
 func GameHandler(c *gin.Context) {
@@ -86,4 +51,52 @@ func GameHandler(c *gin.Context) {
 	go player.Read(&gameServer)
 
 	go player.Write(&gameServer)
+}
+
+func CreateGame(c *gin.Context) {
+	gameId := uuid.Must(uuid.NewV4(), nil).String()
+	gameServer.Game[gameId] = &models.Game{
+		Id:          uint(len(gameServer.Game)) + 1,
+		Players:     make([]*models.Player, 0),
+		CurrentTurn: nil,
+	}
+
+	//
+	c.JSON(http.StatusOK, gin.H{
+		"GamesList": gameServer.Game,
+	})
+}
+
+func GetOnlinePlayers(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"PlayerList": gameServer.Players,
+	})
+}
+func GetGames(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"GameList": gameServer.Game,
+	})
+}
+
+func DeleteGame(c *gin.Context) {
+	gameId, _ := c.Params.Get("gameId")
+
+	delete(gameServer.Game, gameId)
+	//
+	c.JSON(http.StatusOK, gin.H{
+		"GamesList": gameServer.Game,
+	})
+}
+
+func JoinGame(c *gin.Context) {
+	gameId, _ := c.Params.Get("gameId")
+	playerId, _ := c.Params.Get("playerId")
+
+	gameServer.Game[gameId].Players = append(gameServer.Game[gameId].Players, gameServer.Players[playerId])
+	gameServer.Players[playerId].GameId = gameId
+
+	//
+	c.JSON(http.StatusOK, gin.H{
+		"status": "Successfully joined",
+	})
 }

@@ -14,7 +14,7 @@ type Player struct {
 	Send   chan []byte
 	Answer string
 	// TODO 實作房間機制
-	RoomId string
+	GameId string
 	// 回合制
 	// 1. isMyTurn判斷
 	// 2. mutex加鎖
@@ -58,7 +58,7 @@ func (player *Player) Write(gameServer *GameServer) {
 }
 
 func read(myself *Player, gameServer *GameServer, message []byte) {
-	game := gameServer.Game
+	game := gameServer.Game[myself.GameId]
 	messageToStr := string(message)
 	strSplit := strings.Split(messageToStr, "")
 	isValid := true
