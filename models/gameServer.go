@@ -1,7 +1,10 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
+	messageType "gin-practice/enum/message"
+	playerStatusType "gin-practice/enum/playerStatus"
 	"gin-practice/utils"
 )
 
@@ -20,16 +23,26 @@ func (gameServer *GameServer) Init() {
 
 			// gameServer.Players[conn] = true
 
-			gameServer.SendPlayers(utils.FormatToJson("A new socket has connected. "), conn)
+			gameServer.SendPlayers(utils.Resp("A new socket has connected. "), conn)
+
+			type PlayerData struct {
+				Id string
+			}
+
+			jsonData, _ := json.Marshal(&PlayerData{Id: conn.Id})
+			gameServer.SendPlayer(jsonData, conn)
+
+			gameServer.Players[conn.Id] = conn
+
+			conn.Status = playerStatusType.INLOBBY
 
 		case conn := <-gameServer.Unregister:
 
-			fmt.Println(conn)
-			// if _, ok := gameServer.Players[conn]; ok {
-			// 	close(conn.Send)
-			// 	delete(gameServer.Players, conn)
-			// 	gameServer.SendGamePlayers(conn.GameId, utils.FormatToJson("socket has disconnected. "), conn)
-			// }
+			if _, ok := gameServer.Players[conn.Id]; ok {
+				close(conn.Send)
+				delete(gameServer.Players, conn.Id)
+				// gameServer.SendGamePlayers(conn.GameId, utils.Resp("socket has disconnected. "), conn)
+			}
 
 		case message := <-gameServer.Broadcast:
 
@@ -75,9 +88,51 @@ func (gameServer *GameServer) SendPlayers(message []byte, ignore *Player) {
 
 // 發送給伺服器內的指定玩家
 func (gameServer *GameServer) SendPlayer(message []byte, player *Player) {
-	for _, conn := range gameServer.Players {
-		if conn == player {
-			conn.Send <- message
+	player.Send <- message
+}
+
+func (gameServer *GameServer) getGames() []byte {
+	type gameResponse struct {
+		Id           string `json:"id"`
+		PlayerAmount int    `json:"playerAmount"`
+	}
+
+	var gameList = make([]*gameResponse, 0)
+	for _, v := range gameServer.Game {
+		gameList = append(gameList, &gameResponse{
+			Id:           v.Id,
+			PlayerAmount: len(v.Players),
+		})
+	}
+	gameRespData, err := json.Marshal(gameList)
+	if err != nil {
+		fmt.Println(gameRespData)
+	}
+	return gameRespData
+}
+
+func (gameServer *GameServer) joinGame(gameId string, playerId string) {
+	game := gameServer.Game[gameId]
+
+	for _, player := range game.Players {
+		if player.Id == playerId {
+			return
 		}
 	}
+	game.Players = append(game.Players, gameServer.Players[playerId])
+	gameServer.Players[playerId].GameId = gameId
+
+	if len(game.Players) == 2 {
+		game.Init()
+		gameServer.SendGamePlayers(gameId, utils.RespMessage(&utils.Message{
+			Type: messageType.GAME_START,
+		}), nil)
+
+		for _, player := range game.Players {
+			player.Status = playerStatusType.PLAYING
+		}
+	} else {
+		gameServer.Players[playerId].Status = playerStatusType.WAITINGSTART
+	}
+
 }

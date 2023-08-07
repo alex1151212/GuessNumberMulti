@@ -1,6 +1,10 @@
 package models
 
 import (
+	"encoding/json"
+	"fmt"
+	messageType "gin-practice/enum/message"
+	playerStatusType "gin-practice/enum/playerStatus"
 	"gin-practice/utils"
 	"strconv"
 	"strings"
@@ -13,11 +17,9 @@ type Player struct {
 	Socket *websocket.Conn
 	Send   chan []byte
 	Answer string
-	// TODO 實作房間機制
+	Status playerStatusType.PlayerStatusType
+
 	GameId string
-	// 回合制
-	// 1. isMyTurn判斷
-	// 2. mutex加鎖
 }
 
 func (player *Player) Read(gameServer *GameServer) {
@@ -32,7 +34,7 @@ func (player *Player) Read(gameServer *GameServer) {
 			break
 		}
 
-		read(player, gameServer, message)
+		messageHandler(player, gameServer, message)
 
 	}
 }
@@ -57,33 +59,109 @@ func (player *Player) Write(gameServer *GameServer) {
 	}
 }
 
-func read(myself *Player, gameServer *GameServer, message []byte) {
-	game := gameServer.Game[myself.GameId]
-	messageToStr := string(message)
-	strSplit := strings.Split(messageToStr, "")
-	isValid := true
-	for _, str := range strSplit {
-		_, err := strconv.Atoi(str)
-		if err != nil {
-			isValid = false
-		}
-	}
-	if game.CurrentTurn == myself && isValid {
-		for _, player := range game.Players {
-			if player == myself {
-				res := game.gameResponse(string(message), myself)
-				gameServer.SendGamePlayer(utils.FormatToJson("Your guess number is: "+string(message)), myself)
-				gameServer.SendGamePlayer(utils.FormatToJson("Response: "+res), myself)
-			} else {
-				gameServer.SendGamePlayer(utils.FormatToJson("User guess your number is: "+string(message)), player)
-				gameServer.SendGamePlayer(utils.FormatToJson("It's your turn. "+string(message)), player)
-				game.CurrentTurn = player
-			}
+func messageHandler(myself *Player, gameServer *GameServer, message []byte) {
 
-		}
-	} else if !isValid {
-		gameServer.SendGamePlayer(utils.FormatToJson("Your guess number is not valid: "+string(message)), myself)
-	} else {
-		gameServer.SendGamePlayer(utils.FormatToJson("Its not your turn. "), myself)
+	var data utils.Message
+
+	err := json.Unmarshal(message, &data)
+	if err != nil {
+		fmt.Println(err)
 	}
+
+	fmt.Println(data.Type)
+
+	switch data.Type {
+	case messageType.INIT:
+		gameRespData := gameServer.getGames()
+
+		myself.Send <- utils.RespMessage(&utils.Message{
+			Type: messageType.GET_GAMES,
+			Data: string(gameRespData),
+		})
+		return
+	case messageType.GET_GAMES:
+
+		gameRespData := gameServer.getGames()
+
+		myself.Send <- utils.RespMessage(&utils.Message{
+			Type: messageType.GET_GAMES,
+			Data: string(gameRespData),
+		})
+
+		return
+	case messageType.CREATE_GAMES:
+		break
+	case messageType.GET_PLAYERS:
+		break
+	case messageType.JOIN_GAME:
+
+		gameId := data.Data.(map[string]interface{})["gameId"].(string)
+		playerId := data.Data.(map[string]interface{})["playerId"].(string)
+
+		gameServer.joinGame(gameId, playerId)
+
+		gameRespData := gameServer.getGames()
+
+		for _, player := range gameServer.Players {
+			if player.Status == playerStatusType.INLOBBY {
+				gameServer.SendPlayer(utils.RespMessage(&utils.Message{
+					Type: messageType.GET_GAMES,
+					Data: string(gameRespData),
+				}), player)
+			}
+		}
+
+		// myself.Send <- utils.RespMessage(&utils.Message{
+		// 	Type: messageType.GET_GAMES,
+		// 	Data: string(gameRespData),
+		// })
+
+		return
+	case messageType.PLAYING:
+
+		number := data.Data.(map[string]interface{})["value"].(string)
+
+		game := gameServer.Game[myself.GameId]
+
+		messageToStr := string(number)
+		strSplit := strings.Split(messageToStr, "")
+		isValid := true
+		for _, str := range strSplit {
+			_, err := strconv.Atoi(str)
+			if err != nil {
+				isValid = false
+			}
+		}
+		respA, respB := game.gameResponse(messageToStr, myself)
+		respMessage := utils.RespMessage(&utils.Message{
+			Type: messageType.PLAYING,
+			Data: &utils.PlayingDataType{
+				Resp: utils.PlayingRespType{
+					A: respA,
+					B: respB,
+				},
+				Round: game.CurrentTurn.Id,
+			},
+		})
+		if game.CurrentTurn == myself && isValid {
+			for _, player := range game.Players {
+				if player == myself {
+					gameServer.SendGamePlayer(respMessage, player)
+				} else {
+					gameServer.SendGamePlayer(respMessage, player)
+					game.CurrentTurn = player
+				}
+
+			}
+			return
+		} else if !isValid {
+			return
+			// Your guess number is not valid:
+		} else {
+			return
+			// Its not your turn.
+		}
+
+	}
+
 }

@@ -8,7 +8,7 @@ import (
 )
 
 type Game struct {
-	Id          uint
+	Id          string
 	Players     []*Player
 	CurrentTurn *Player
 }
@@ -27,22 +27,21 @@ func PlayerAmountHandler(game Game, player *Player) {
 	}
 }
 
-func (game *Game) gameResponse(number string, c *Player) string {
-	var answer map[string]string = make(map[string]string)
+func (game *Game) gameResponse(number string, c *Player) (respA string, respB string) {
+	var answer map[int]string = make(map[int]string)
 	var a, b int
-	var returnStr string
 	for _, client := range game.Players {
 		if client != c {
 			strAnswerList := strings.Split(client.Answer, "")
 			for index, item := range strAnswerList {
-				answer[string(index)] = item
+				answer[index] = item
 			}
 		}
 	}
 	strNumberList := strings.Split(number, "")
-
 	for index, item := range strNumberList {
-		if answer[string(index)] == item {
+		if answer[index] == item {
+
 			a += 1
 		} else {
 			for _, value := range answer {
@@ -52,7 +51,7 @@ func (game *Game) gameResponse(number string, c *Player) string {
 			}
 		}
 	}
-	returnStr = fmt.Sprintf("%dA %dB", a, b)
-
-	return returnStr
+	respA = fmt.Sprintf("%d", a)
+	respB = fmt.Sprintf("%d", b)
+	return
 }
