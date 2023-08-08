@@ -15,33 +15,12 @@
 # https://docs.gitlab.com/ee/development/cicd/templates.html
 # This specific template is located at:
 # https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Getting-Started.gitlab-ci.yml
-image: golang:latest
-
-variables:
-  ARTIFACTS_DIR: artifacts
-  GO_PROJECT: gitlab.codle.cc/alex1151212/guessnumbermulti
-
-before_script:
-  - go version
-  - export GO111MODULE=on
-  - mkdir -p ${CI_PROJECT_DIR}/${ARTIFACTS_DIR}
-
 stages:          # List of stages for jobs, and their order of execution
   - build
-  - deploy
-
-gobuild:
-  stage: build
-  script:
-    - go build -o  ${CI_PROJECT_DIR}/${ARTIFACTS_DIR}/main
-  artifacts:
-    paths:
-      - ${ARTIFACTS_DIR}
-    expire_in: 1h
 
 deploy-job:      # This job runs in the deploy stage.
   stage: deploy  # It only runs when *both* jobs in the test stage complete successfully.
   environment: production
   script:
-    - echo "Deploying application..."
-    - echo "Application successfully deployed."
+    - docker-compose up -d --build –force-recreate
+
