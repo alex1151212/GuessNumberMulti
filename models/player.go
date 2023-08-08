@@ -7,8 +7,6 @@ import (
 	messageType "guessNumber/enum/message"
 	playerStatusType "guessNumber/enum/playerStatus"
 	"guessNumber/utils"
-	"strconv"
-	"strings"
 
 	"github.com/gorilla/websocket"
 )
@@ -111,8 +109,9 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 
 		number := data.Data.(map[string]interface{})["value"].(string)
 
-		ok := utils.ValidateNumber(number)
+		game := gameServer.Game[player.GameId]
 
+		ok := utils.ValidateNumber(number)
 		// 輸入無效值
 		if !ok {
 			player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
@@ -121,18 +120,7 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 			})
 		}
 
-		game := gameServer.Game[player.GameId]
-
-		messageToStr := string(number)
-		strSplit := strings.Split(messageToStr, "")
-		isValid := true
-		for _, str := range strSplit {
-			_, err := strconv.Atoi(str)
-			if err != nil {
-				isValid = false
-			}
-		}
-		respA, respB := game.gameResponse(messageToStr, player)
+		respA, respB := game.gameResponse(number, player)
 
 		if game.Status == gameStatusType.NORMAL_END {
 			respMessage := utils.RespMessage(
@@ -156,7 +144,7 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 			},
 		)
 
-		if game.CurrentTurn == player && isValid {
+		if game.CurrentTurn == player {
 			for _, gamePlayer := range game.Players {
 				if player != gamePlayer {
 					game.CurrentTurn = gamePlayer
@@ -164,12 +152,6 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 			}
 			gameServer.SendGamePlayers(game.Id, respMessage, nil)
 			return
-		} else if !isValid {
-			return
-			// Your guess number is not valid:
-		} else {
-			return
-			// Its not your turn.
 		}
 
 	}
