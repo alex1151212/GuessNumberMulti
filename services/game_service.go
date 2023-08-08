@@ -52,6 +52,10 @@ func GameHandler(c *gin.Context) {
 	go player.Write(&gameServer)
 }
 
+/*
+測試用 API
+*/
+
 func CreateGame(c *gin.Context) {
 
 	gameId, _ := c.Params.Get("gameId")

@@ -14,6 +14,9 @@ type JoinGameDataType struct {
 	PlayerId string `json:"playerId,omitempty"`
 	GameId   string `json:"gameId,omitempty"`
 }
+type CreateGameDataType struct {
+	GameId string `json:"gameId,omitempty"`
+}
 type PlayingDataType struct {
 	Value string          `json:"value,omitempty"`
 	Resp  PlayingRespType `json:"resp,omitempty"`

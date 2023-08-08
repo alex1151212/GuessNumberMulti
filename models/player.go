@@ -86,6 +86,9 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 
 		return
 	case messageType.CREATE_GAMES:
+		// TODO WebSocket CreateGame
+		// gameId := data.Data.(map[string]interface{})["gameId"].(string)
+
 		break
 	case messageType.GET_PLAYERS:
 		break
@@ -124,7 +127,7 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 
 		if game.Status == gameStatusType.NORMAL_END {
 			respMessage := utils.RespMessage(
-				messageType.GAME_END, &utils.GameEndRespType{
+				messageType.NORMAL_END, &utils.GameEndRespType{
 					GameId:     game.Id,
 					GameStatus: gameStatusType.NORMAL_END,
 					Winner:     game.Winner.Id,
