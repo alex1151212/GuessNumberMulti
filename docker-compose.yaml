@@ -1,0 +1,19 @@
+version: "3.9"
+services:
+  gnm-backend:
+    stdin_open: true
+    tty: true
+    image: gnm-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gnm-backend
+    restart: always
+    networks:
+      default:
+        ipv4_address: "172.18.0.11"
+networks:
+  default:
+    name: webapps
+    external: true
+
