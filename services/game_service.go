@@ -60,7 +60,7 @@ func GameHandler(c *gin.Context) {
 }
 
 func CreateGame(c *gin.Context) {
-	// gameId := uuid.Must(uuid.NewV4(), nil).String()
+
 	gameId, _ := c.Params.Get("gameId")
 
 	if gameServer.Game[gameId] == nil {
@@ -95,7 +95,6 @@ func CreateGame(c *gin.Context) {
 		}
 	}
 
-	//
 	c.JSON(http.StatusOK, gin.H{
 		"GamesList": gameServer.Game,
 	})
@@ -126,7 +125,7 @@ func DeleteGame(c *gin.Context) {
 	gameId, _ := c.Params.Get("gameId")
 
 	delete(gameServer.Game, gameId)
-	//
+
 	c.JSON(http.StatusOK, gin.H{
 		"GamesList": gameServer.Game,
 	})
@@ -146,7 +145,6 @@ func JoinGame(c *gin.Context) {
 		gameServer.SendGamePlayers(gameId, utils.Resp("Game Start"), nil)
 	}
 
-	//
 	c.JSON(http.StatusOK, gin.H{
 		"status": "Successfully joined",
 	})

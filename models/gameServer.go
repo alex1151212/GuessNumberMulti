@@ -39,6 +39,7 @@ func (gameServer *GameServer) Init() {
 			if _, ok := gameServer.Players[conn.Id]; ok {
 				close(conn.Send)
 				delete(gameServer.Players, conn.Id)
+				// TODO 通知對手玩家已斷線
 				// gameServer.SendGamePlayers(conn.GameId, utils.Resp("socket has disconnected. "), conn)
 			}
 
@@ -131,6 +132,6 @@ func (gameServer *GameServer) joinGame(gameId string, playerId string) {
 			player.Status = playerStatusType.PLAYING
 		}
 	} else {
-		gameServer.Players[playerId].Status = playerStatusType.WAITINGSTART
+		gameServer.Players[playerId].Status = playerStatusType.WAITING_START
 	}
 }

@@ -10,7 +10,6 @@ type Message struct {
 	Recipient string                  `json:"recipient,omitempty"`
 	Data      interface{}             `json:"data,omitempty"`
 	Type      messageType.MessageType `json:"type,omitempty"`
-	// Test      string `json:"test,omitempty"`
 }
 type JoinGameDataType struct {
 	PlayerId string `json:"playerId,omitempty"`
