@@ -72,13 +72,6 @@ func messageHandler(myself *Player, gameServer *GameServer, message []byte) {
 
 	switch data.Type {
 	case messageType.INIT:
-		gameRespData := gameServer.getGames()
-
-		myself.Send <- utils.RespMessage(&utils.Message{
-			Type: messageType.GET_GAMES,
-			Data: string(gameRespData),
-		})
-		return
 	case messageType.GET_GAMES:
 
 		gameRespData := gameServer.getGames()
@@ -110,12 +103,6 @@ func messageHandler(myself *Player, gameServer *GameServer, message []byte) {
 				}), player)
 			}
 		}
-
-		// myself.Send <- utils.RespMessage(&utils.Message{
-		// 	Type: messageType.GET_GAMES,
-		// 	Data: string(gameRespData),
-		// })
-
 		return
 	case messageType.PLAYING:
 

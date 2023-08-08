@@ -21,8 +21,6 @@ func (gameServer *GameServer) Init() {
 		select {
 		case conn := <-gameServer.Register:
 
-			// gameServer.Players[conn] = true
-
 			gameServer.SendPlayers(utils.Resp("A new socket has connected. "), conn)
 
 			type PlayerData struct {
@@ -44,6 +42,7 @@ func (gameServer *GameServer) Init() {
 				// gameServer.SendGamePlayers(conn.GameId, utils.Resp("socket has disconnected. "), conn)
 			}
 
+		// Broadcast
 		case message := <-gameServer.Broadcast:
 
 			fmt.Println(message)
@@ -134,5 +133,4 @@ func (gameServer *GameServer) joinGame(gameId string, playerId string) {
 	} else {
 		gameServer.Players[playerId].Status = playerStatusType.WAITINGSTART
 	}
-
 }
