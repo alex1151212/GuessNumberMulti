@@ -1,13 +1,13 @@
 version: "3.9"
 services:
-  GNM-Backend:
+  gnm-Backend:
     stdin_open: true
     tty: true
-    image: GNM-Backend
+    image: gnm-Backend
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: GNM-Backend
+    container_name: gnm-Backend
     restart: always
     networks:
       default:
