@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"gin-practice/services"
+	"guessNumber/services"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+
 	r := gin.Default()
 
 	corsConfig := cors.DefaultConfig()

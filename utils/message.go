@@ -2,14 +2,13 @@ package utils
 
 import (
 	"encoding/json"
-	messageType "gin-practice/enum/message"
+	gameStatusType "guessNumber/enum/gameStatus"
+	messageType "guessNumber/enum/message"
 )
 
 type Message struct {
-	Sender    string                  `json:"sender,omitempty"`
-	Recipient string                  `json:"recipient,omitempty"`
-	Data      interface{}             `json:"data,omitempty"`
-	Type      messageType.MessageType `json:"type,omitempty"`
+	Data interface{}             `json:"data,omitempty"`
+	Type messageType.MessageType `json:"type,omitempty"`
 }
 type JoinGameDataType struct {
 	PlayerId string `json:"playerId,omitempty"`
@@ -21,8 +20,21 @@ type PlayingDataType struct {
 	Round string          `json:"round,omitempty"`
 }
 type PlayingRespType struct {
-	A string `json:"a,omitempty"`
-	B string `json:"b,omitempty"`
+	A string `json:"a"`
+	B string `json:"b"`
+}
+type GameRoomRespType struct {
+	Id           string `json:"id"`
+	PlayerAmount int    `json:"playerAmount"`
+}
+type GameEndRespType struct {
+	GameId     string                        `json:"gameId"`
+	Winner     string                        `json:"winner"`
+	GameStatus gameStatusType.GameStatusType `json:"gameStatus"`
+}
+type ErrorRespType struct {
+	Code    int
+	Message string
 }
 
 func Resp(message string) []byte {
@@ -30,7 +42,17 @@ func Resp(message string) []byte {
 	return jsonData
 }
 
-func RespMessage(message *Message) []byte {
-	jsonData, _ := json.Marshal(message)
+func RespMessage(messageType messageType.MessageType, data interface{}) []byte {
+	var jsonData []byte
+	if data == nil {
+		jsonData, _ = json.Marshal((&Message{Type: messageType}))
+	} else {
+		jsonData, _ = json.Marshal((&Message{Data: data, Type: messageType}))
+	}
+	return jsonData
+}
+
+func RespErrorMessage(data ErrorRespType) []byte {
+	jsonData := RespMessage(messageType.ERROR, data)
 	return jsonData
 }

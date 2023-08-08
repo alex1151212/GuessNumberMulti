@@ -10,4 +10,6 @@ const (
 	GET_PLAYERS  MessageType = "GetPlayers"
 	JOIN_GAME    MessageType = "JoinGame"
 	GAME_START   MessageType = "GameStart"
+	GAME_END     MessageType = "GameEnd"
+	ERROR        MessageType = "Error"
 )

@@ -3,9 +3,9 @@ package models
 import (
 	"encoding/json"
 	"fmt"
-	messageType "gin-practice/enum/message"
-	playerStatusType "gin-practice/enum/playerStatus"
-	"gin-practice/utils"
+	messageType "guessNumber/enum/message"
+	playerStatusType "guessNumber/enum/playerStatus"
+	"guessNumber/utils"
 )
 
 type GameServer struct {
@@ -91,47 +91,20 @@ func (gameServer *GameServer) SendPlayer(message []byte, player *Player) {
 	player.Send <- message
 }
 
-func (gameServer *GameServer) getGames() []byte {
-	type gameResponse struct {
-		Id           string `json:"id"`
-		PlayerAmount int    `json:"playerAmount"`
-	}
+func (gameServer *GameServer) getGames() map[string]*utils.GameRoomRespType {
 
-	var gameList = make([]*gameResponse, 0)
-	for _, v := range gameServer.Game {
-		gameList = append(gameList, &gameResponse{
-			Id:           v.Id,
+	var gameList = make(map[string]*utils.GameRoomRespType)
+	for k, v := range gameServer.Game {
+		gameList[k] = &utils.GameRoomRespType{
+			Id:           k,
 			PlayerAmount: len(v.Players),
-		})
-	}
-	gameRespData, err := json.Marshal(gameList)
-	if err != nil {
-		fmt.Println(gameRespData)
-	}
-	return gameRespData
-}
-
-func (gameServer *GameServer) joinGame(gameId string, playerId string) {
-	game := gameServer.Game[gameId]
-
-	for _, player := range game.Players {
-		if player.Id == playerId {
-			return
 		}
 	}
-	game.Players = append(game.Players, gameServer.Players[playerId])
-	gameServer.Players[playerId].GameId = gameId
-
-	if len(game.Players) == 2 {
-		game.Init()
-		gameServer.SendGamePlayers(gameId, utils.RespMessage(&utils.Message{
-			Type: messageType.GAME_START,
-		}), nil)
-
-		for _, player := range game.Players {
-			player.Status = playerStatusType.PLAYING
+	for _, player := range gameServer.Players {
+		if player.Status == playerStatusType.INLOBBY {
+			gameServer.SendPlayer(utils.RespMessage(messageType.GET_GAMES, gameList), player)
 		}
-	} else {
-		gameServer.Players[playerId].Status = playerStatusType.WAITING_START
 	}
+
+	return gameList
 }

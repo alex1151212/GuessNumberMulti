@@ -1,4 +1,4 @@
-module gin-practice
+module guessNumber
 
 go 1.19
 

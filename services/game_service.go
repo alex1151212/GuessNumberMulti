@@ -1,12 +1,11 @@
 package services
 
 import (
-	"encoding/json"
-	"fmt"
-	messageType "gin-practice/enum/message"
-	playerStatusType "gin-practice/enum/playerStatus"
-	"gin-practice/models"
-	"gin-practice/utils"
+	gameStatusType "guessNumber/enum/gameStatus"
+	messageType "guessNumber/enum/message"
+	playerStatusType "guessNumber/enum/playerStatus"
+	"guessNumber/models"
+	"guessNumber/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -21,11 +20,6 @@ var gameServer = models.GameServer{
 	Unregister: make(chan *models.Player),
 	Players:    make(map[string]*models.Player),
 }
-
-// &models.Game{
-// 	Players:     make([]*models.Player, 0),
-// 	CurrentTurn: nil,
-// }
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024 * 1024 * 1024,
@@ -56,42 +50,33 @@ func GameHandler(c *gin.Context) {
 	go player.Read(&gameServer)
 
 	go player.Write(&gameServer)
-
 }
 
 func CreateGame(c *gin.Context) {
 
 	gameId, _ := c.Params.Get("gameId")
+	game := gameServer.Game[gameId]
 
-	if gameServer.Game[gameId] == nil {
+	if game == nil {
 		gameServer.Game[gameId] = &models.Game{
 			Id:          gameId,
 			Players:     make([]*models.Player, 0),
 			CurrentTurn: nil,
+			Winner:      nil,
+			Status:      gameStatusType.WAITING,
 		}
 	}
 
-	type gameResponse struct {
-		Id           string `json:"id"`
-		PlayerAmount int    `json:"playerAmount"`
-	}
-	var gameList = make(map[string]*gameResponse)
+	var gameList = make(map[string]*utils.GameRoomRespType)
 	for k, v := range gameServer.Game {
-		gameList[k] = &gameResponse{
+		gameList[k] = &utils.GameRoomRespType{
 			Id:           k,
 			PlayerAmount: len(v.Players),
 		}
 	}
-	gameRespData, err := json.Marshal(gameList)
-	if err != nil {
-		fmt.Println(gameRespData)
-	}
 	for _, player := range gameServer.Players {
 		if player.Status == playerStatusType.INLOBBY {
-			gameServer.SendPlayer(utils.RespMessage(&utils.Message{
-				Type: messageType.GET_GAMES,
-				Data: string(gameRespData),
-			}), player)
+			gameServer.SendPlayer(utils.RespMessage(messageType.GET_GAMES, gameList), player)
 		}
 	}
 
@@ -103,13 +88,14 @@ func CreateGame(c *gin.Context) {
 func GetOnlinePlayers(c *gin.Context) {
 
 	var players []string = make([]string, 0)
-	for key, _ := range gameServer.Players {
+	for key := range gameServer.Players {
 		players = append(players, key)
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"PlayerList": players,
 	})
 }
+
 func GetGames(c *gin.Context) {
 	var gameList = make([]*models.Game, 0)
 	for _, v := range gameServer.Game {
