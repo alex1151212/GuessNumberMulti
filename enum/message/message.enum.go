@@ -9,6 +9,7 @@ const (
 	CREATE_GAMES MessageType = "CreateGames"
 	GET_PLAYERS  MessageType = "GetPlayers"
 	JOIN_GAME    MessageType = "JoinGame"
+	DELETE_GAME  MessageType = "DeleteGame"
 
 	GAME_START MessageType = "GameStart"
 	NORMAL_END MessageType = "NormalEnd"

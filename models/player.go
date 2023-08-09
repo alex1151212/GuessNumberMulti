@@ -17,7 +17,7 @@ type Player struct {
 	Send   chan []byte
 	Answer string
 	Status playerStatusType.PlayerStatusType
-	GameId string
+	GameId *string
 }
 
 func (player *Player) Read(gameServer *GameServer) {
@@ -86,33 +86,35 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 
 		return
 	case messageType.CREATE_GAMES:
-		// TODO WebSocket CreateGame
-		// gameId := data.Data.(map[string]interface{})["gameId"].(string)
 
-		break
+		gameId := data.Data.(map[string]interface{})["gameId"].(string)
+		gameServer.GameNew <- gameId
+
+		return
 	case messageType.GET_PLAYERS:
 		break
 	case messageType.JOIN_GAME:
 
 		gameId := data.Data.(map[string]interface{})["gameId"].(string)
-		playerId := data.Data.(map[string]interface{})["playerId"].(string)
 
-		joinGame(gameServer, player, gameId, playerId)
+		if game := gameServer.Game[gameId]; game != nil {
+			gameServer.Game[gameId].Join <- player
 
-		gameRespData := gameServer.getGames()
-
-		// 對所有閒置在大廳的玩家發送房間更新資料
-		for _, player := range gameServer.Players {
-			if player.Status == playerStatusType.INLOBBY {
-				gameServer.SendPlayer(utils.RespMessage(messageType.GET_GAMES, gameRespData), player)
+			gameRespData := gameServer.getGames()
+			for _, v := range gameRespData {
+				fmt.Println(v)
 			}
+
+			jsonData := utils.RespMessage(messageType.GET_GAMES, gameRespData)
+			gameServer.SendInLobbyPlayers(jsonData)
 		}
+
 		return
 	case messageType.PLAYING:
 
 		number := data.Data.(map[string]interface{})["value"].(string)
 
-		game := gameServer.Game[player.GameId]
+		game := gameServer.Game[*player.GameId]
 
 		ok := utils.ValidateNumber(number)
 		// 輸入無效值
@@ -123,17 +125,19 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 			})
 		}
 
-		respA, respB := game.gameResponse(number, player)
+		respA, respB := game.GameHandler(number, player)
 
 		if game.Status == gameStatusType.NORMAL_END {
 			respMessage := utils.RespMessage(
 				messageType.NORMAL_END, &utils.GameEndRespType{
-					GameId:     game.Id,
+					GameId:     *game.Id,
 					GameStatus: gameStatusType.NORMAL_END,
 					Winner:     game.Winner.Id,
 				},
 			)
-			gameServer.SendGamePlayers(game.Id, respMessage, nil)
+
+			gameServer.Game[*game.Id].Broadcast <- respMessage
+			gameServer.GameEnd <- game
 			return
 		}
 
@@ -153,55 +157,13 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 					game.CurrentTurn = gamePlayer
 				}
 			}
-			gameServer.SendGamePlayers(game.Id, respMessage, nil)
+			gameServer.Game[*game.Id].Broadcast <- respMessage
 			return
 		}
-
+	case messageType.DELETE_GAME:
+		gameId := data.Data.(map[string]interface{})["gameId"].(string)
+		fmt.Println(gameId)
+		// delete(gameServer.Game, gameId)
 	}
 
-}
-
-func joinGame(gameServer *GameServer, player *Player, gameId string, playerId string) {
-
-	game, ok := gameServer.Game[gameId]
-
-	// 找不到 gameId 的遊戲
-	if !ok {
-		gameServer.SendPlayer(utils.RespMessage(messageType.GAME_START, nil), player)
-		return
-	}
-
-	// 遊戲已滿
-	if len(game.Players) >= 2 {
-		player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
-			Code:    1003,
-			Message: "The Game Room is Full",
-		})
-		return
-	}
-
-	// 嘗試重複新增同樣的玩家
-	for _, player := range game.Players {
-		if player.Id == playerId {
-			player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
-				Code:    1002,
-				Message: "The Game Already Exist this Player",
-			})
-			return
-		}
-	}
-
-	game.Players = append(game.Players, gameServer.Players[playerId])
-	gameServer.Players[playerId].GameId = gameId
-
-	if len(game.Players) == 2 {
-		game.Init()
-		gameServer.SendGamePlayers(gameId, utils.RespMessage(messageType.GAME_START, nil), nil)
-
-		for _, player := range game.Players {
-			player.Status = playerStatusType.PLAYING
-		}
-	} else {
-		gameServer.Players[playerId].Status = playerStatusType.WAITING_START
-	}
 }

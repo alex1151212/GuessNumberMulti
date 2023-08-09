@@ -34,7 +34,7 @@ func main() {
 	r.GET("/list/players", services.GetOnlinePlayers)
 	r.GET("/delete/game/:gameId", services.DeleteGame)
 
-	fmt.Println("chat server start.....")
+	fmt.Println("Game server start.....")
 
 	r.Run(":8448")
 }
