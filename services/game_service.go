@@ -71,8 +71,6 @@ func CreateGame(c *gin.Context) {
 			CurrentTurn: nil,
 			Winner:      nil,
 			Status:      gameStatusType.WAITING,
-			Leave:       make(chan *models.Player),
-			Join:        make(chan *models.Player),
 			Broadcast:   make(chan []byte, 1),
 		}
 		game = gameServer.Game[gameId]
@@ -134,7 +132,7 @@ func JoinGame(c *gin.Context) {
 
 	game := gameServer.Game[gameId]
 
-	game.Join <- gameServer.Players[playerId]
+	game.JoinGame(gameServer.Players[playerId])
 	gameServer.Players[playerId].GameId = &gameId
 
 	if len(game.Players) == 2 {

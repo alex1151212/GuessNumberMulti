@@ -20,6 +20,7 @@ type Player struct {
 	GameId *string
 }
 
+// 監聽 player.Socket.ReadMessage()
 func (player *Player) Read(gameServer *GameServer) {
 	defer func() {
 		_ = player.Socket.Close()
@@ -37,7 +38,7 @@ func (player *Player) Read(gameServer *GameServer) {
 	}
 }
 
-// 傳送訊息給玩家
+// 監聽 Player.Send
 func (player *Player) Write(gameServer *GameServer) {
 	defer func() {
 		_ = player.Socket.Close()
@@ -98,12 +99,9 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 		gameId := data.Data.(map[string]interface{})["gameId"].(string)
 
 		if game := gameServer.Game[gameId]; game != nil {
-			gameServer.Game[gameId].Join <- player
+			gameServer.Game[gameId].JoinGame(player)
 
 			gameRespData := gameServer.getGames()
-			for _, v := range gameRespData {
-				fmt.Println(v)
-			}
 
 			jsonData := utils.RespMessage(messageType.GET_GAMES, gameRespData)
 			gameServer.SendInLobbyPlayers(jsonData)

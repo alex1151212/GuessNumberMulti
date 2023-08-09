@@ -47,7 +47,7 @@ func (gameServer *GameServer) Init() {
 				delete(gameServer.Players, conn.Id)
 
 				if gameId != nil {
-					gameServer.Game[*conn.GameId].Leave <- conn
+					gameServer.Game[*conn.GameId].LeaveGame(conn)
 				}
 
 			}
@@ -129,8 +129,6 @@ func (gameServer *GameServer) createGame(gameId string) {
 			CurrentTurn: nil,
 			Winner:      nil,
 			Status:      gameStatusType.WAITING,
-			Leave:       make(chan *Player),
-			Join:        make(chan *Player),
 			Broadcast:   make(chan []byte, 1),
 		}
 		game = gameServer.Game[gameId]

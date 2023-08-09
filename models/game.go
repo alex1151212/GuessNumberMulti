@@ -17,8 +17,6 @@ type Game struct {
 	Status      gameStatusType.GameStatusType
 
 	// 玩家管理頻道
-	Leave     chan *Player
-	Join      chan *Player
 	Broadcast chan []byte
 }
 
@@ -33,25 +31,6 @@ func (game *Game) Init() {
 func (game *Game) gamePlayerHandler() {
 	for {
 		select {
-		case player := <-game.Join:
-			joinGame(game, player)
-
-			// 開始遊戲判斷
-			if len(game.Players) == 2 {
-				player.Send <- utils.RespMessage(messageType.GAME_START, nil)
-				game.startGame()
-				for _, player := range game.Players {
-					player.Status = playerStatusType.PLAYING
-				}
-			} else {
-				player.Status = playerStatusType.WAITING_START
-			}
-
-		case player := <-game.Leave:
-
-			delete(game.Players, player.Id)
-			game.Broadcast <- utils.Resp("Opponent Leave. ")
-
 		case message := <-game.Broadcast:
 			for _, player := range game.Players {
 				player.Send <- message
@@ -68,7 +47,13 @@ func (game *Game) initCurrentRound() {
 	game.CurrentTurn = game.Players[keys[0]]
 }
 
-func joinGame(game *Game, player *Player) {
+func (game *Game) startGame() {
+
+	game.Status = gameStatusType.START
+	game.initCurrentRound()
+}
+
+func (game *Game) JoinGame(player *Player) {
 
 	// 遊戲已滿
 	if len(game.Players) >= 2 {
@@ -94,13 +79,20 @@ func joinGame(game *Game, player *Player) {
 	game.Players[player.Id] = player
 	player.GameId = game.Id
 
+	// 開始遊戲判斷
+	if len(game.Players) == 2 {
+		player.Send <- utils.RespMessage(messageType.GAME_START, nil)
+		game.startGame()
+		for _, player := range game.Players {
+			player.Status = playerStatusType.PLAYING
+		}
+	} else {
+		player.Status = playerStatusType.WAITING_START
+	}
 }
-
-func (game *Game) startGame() {
-
-	game.Status = gameStatusType.START
-	game.initCurrentRound()
-
+func (game *Game) LeaveGame(player *Player) {
+	delete(game.Players, player.Id)
+	game.Broadcast <- utils.Resp("Opponent Leave. ")
 }
 
 // 遊戲邏輯
