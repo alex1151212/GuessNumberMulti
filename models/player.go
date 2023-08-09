@@ -3,7 +3,6 @@ package models
 import (
 	"encoding/json"
 	"fmt"
-	gameStatusType "guessNumber/enum/gameStatus"
 	messageType "guessNumber/enum/message"
 	playerStatusType "guessNumber/enum/playerStatus"
 	"guessNumber/utils"
@@ -86,7 +85,7 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 		)
 
 		return
-	case messageType.CREATE_GAMES:
+	case messageType.CREATE_GAME:
 
 		gameId := data.Data.(map[string]interface{})["gameId"].(string)
 		gameServer.GameNew <- gameId
@@ -123,41 +122,8 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 			})
 		}
 
-		respA, respB := game.GameHandler(number, player)
+		game.GameHandler(gameServer, number, player)
 
-		if game.Status == gameStatusType.NORMAL_END {
-			respMessage := utils.RespMessage(
-				messageType.NORMAL_END, &utils.GameEndRespType{
-					GameId:     *game.Id,
-					GameStatus: gameStatusType.NORMAL_END,
-					Winner:     game.Winner.Id,
-				},
-			)
-
-			gameServer.Game[*game.Id].Broadcast <- respMessage
-			gameServer.GameEnd <- game
-			return
-		}
-
-		respMessage := utils.RespMessage(
-			messageType.PLAYING, &utils.PlayingDataType{
-				Resp: utils.PlayingRespType{
-					A: respA,
-					B: respB,
-				},
-				Round: game.CurrentTurn.Id,
-			},
-		)
-
-		if game.CurrentTurn == player {
-			for _, gamePlayer := range game.Players {
-				if player != gamePlayer {
-					game.CurrentTurn = gamePlayer
-				}
-			}
-			gameServer.Game[*game.Id].Broadcast <- respMessage
-			return
-		}
 	case messageType.DELETE_GAME:
 		gameId := data.Data.(map[string]interface{})["gameId"].(string)
 		fmt.Println(gameId)

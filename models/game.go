@@ -96,46 +96,90 @@ func (game *Game) LeaveGame(player *Player) {
 }
 
 // 遊戲邏輯
-func (game *Game) GameHandler(number string, c *Player) (respA string, respB string) {
-	var answer map[int]string = make(map[int]string)
-	var a, b int
-	if game.Status == gameStatusType.START {
-		for _, client := range game.Players {
-			if client != c {
-				strAnswerList := strings.Split(client.Answer, "")
-				for index, item := range strAnswerList {
-					answer[index] = item
-				}
-			}
-		}
-		strNumberList := strings.Split(number, "")
-		for index, item := range strNumberList {
-			if answer[index] == item {
+func (game *Game) GameHandler(gameServer *GameServer, number string, player *Player) {
 
-				a += 1
-			} else {
-				for _, value := range answer {
-					if value == item {
-						b += 1
-					}
+	var a, b int
+	var respA, respB string
+	if game.Status == gameStatusType.START {
+
+		if game.CurrentTurn == player {
+
+			a, b = calculateGameResult(game, player, number)
+			respA = fmt.Sprintf("%d", a)
+			respB = fmt.Sprintf("%d", b)
+
+			respMessage := utils.RespMessage(
+				messageType.PLAYING, &utils.PlayingDataType{
+					Resp: utils.PlayingRespType{
+						A: respA,
+						B: respB,
+					},
+					Round: game.CurrentTurn.Id,
+				},
+			)
+
+			game.Broadcast <- respMessage
+
+			for _, gamePlayer := range game.Players {
+				if player != gamePlayer {
+					game.CurrentTurn = gamePlayer
 				}
 			}
+
+		} else {
+			return
 		}
 
 		if a == 4 {
-			game.Winner = c
+			game.Winner = player
 			game.Status = gameStatusType.NORMAL_END
 
 			for _, player := range game.Players {
 				player.GameId = nil
-
 			}
-
 		}
-		respA = fmt.Sprintf("%d", a)
-		respB = fmt.Sprintf("%d", b)
+		if game.Status == gameStatusType.NORMAL_END {
+			respMessage := utils.RespMessage(
+				messageType.NORMAL_END, &utils.GameEndRespType{
+					GameId:     *game.Id,
+					GameStatus: gameStatusType.NORMAL_END,
+					Winner:     game.Winner.Id,
+				},
+			)
+
+			game.Broadcast <- respMessage
+
+			gameServer.GameEnd <- game
+
+			return
+		}
 
 	}
+}
 
+func calculateGameResult(game *Game, player *Player, number string) (a int, b int) {
+	var answer map[int]string = make(map[int]string)
+
+	for _, client := range game.Players {
+		if client != player {
+			strAnswerList := strings.Split(client.Answer, "")
+			for index, item := range strAnswerList {
+				answer[index] = item
+			}
+		}
+	}
+	strNumberList := strings.Split(number, "")
+	for index, item := range strNumberList {
+		if answer[index] == item {
+
+			a += 1
+		} else {
+			for _, value := range answer {
+				if value == item {
+					b += 1
+				}
+			}
+		}
+	}
 	return
 }
