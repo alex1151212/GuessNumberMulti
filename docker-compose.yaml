@@ -4,6 +4,10 @@ services:
     stdin_open: true
     tty: true
     image: gnm-backend
+    deploy:
+      resources:
+        limits:
+          memory: 500M
     build:
       context: .
       dockerfile: Dockerfile
