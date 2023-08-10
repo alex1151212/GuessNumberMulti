@@ -99,12 +99,19 @@ func (game *Game) LeaveGame(player *Player) {
 func (game *Game) GameHandler(gameServer *GameServer, number string, player *Player) {
 
 	var a, b int
+	var valid bool
 	var respA, respB string
 	if game.Status == gameStatusType.START {
 
 		if game.CurrentTurn == player {
 
-			a, b = calculateGameResult(game, player, number)
+			a, b, valid = calculateGameResult(game, player, number)
+
+			if !valid {
+				fmt.Println("inptu invalid")
+				return
+			}
+
 			respA = fmt.Sprintf("%d", a)
 			respB = fmt.Sprintf("%d", b)
 
@@ -157,9 +164,10 @@ func (game *Game) GameHandler(gameServer *GameServer, number string, player *Pla
 	}
 }
 
-func calculateGameResult(game *Game, player *Player, number string) (a int, b int) {
+func calculateGameResult(game *Game, player *Player, number string) (a int, b int, valid bool) {
 	var answer map[int]string = make(map[int]string)
 
+	// 取得對手答案
 	for _, client := range game.Players {
 		if client != player {
 			strAnswerList := strings.Split(client.Answer, "")
@@ -168,6 +176,18 @@ func calculateGameResult(game *Game, player *Player, number string) (a int, b in
 			}
 		}
 	}
+
+	charMap := make(map[rune]bool)
+
+	for _, char := range number {
+		if charMap[char] {
+			valid = false
+			return
+		}
+		charMap[char] = true
+	}
+	valid = true
+
 	strNumberList := strings.Split(number, "")
 	for index, item := range strNumberList {
 		if answer[index] == item {
