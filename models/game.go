@@ -92,6 +92,8 @@ func (game *Game) JoinGame(player *Player) {
 }
 func (game *Game) LeaveGame(player *Player) {
 	delete(game.Players, player.Id)
+	player.GameId = nil
+	player.Status = playerStatusType.INLOBBY
 	game.Broadcast <- utils.Resp("Opponent Leave. ")
 }
 

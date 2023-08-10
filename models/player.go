@@ -133,6 +133,18 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 		}
 
 		game.GameHandler(gameServer, number, player)
+	case messageType.LEAVE_GAME:
+		game := gameServer.Game[*player.GameId]
+		game.LeaveGame(player)
+		if len(game.Players) <= 0 {
+			gameServer.GameEnd <- game
+		}
+
+		gameRespData := gameServer.getGames()
+
+		gameServer.SendInLobbyPlayers(utils.RespMessage(
+			messageType.GET_GAMES, gameRespData,
+		))
 
 	case messageType.DELETE_GAME:
 		gameId := data.Data.(map[string]interface{})["gameId"].(string)
