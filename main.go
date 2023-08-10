@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"guessNumber/services"
+	"net/http"
 	"time"
+
+	_ "net/http/pprof"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -36,5 +39,11 @@ func main() {
 
 	fmt.Println("Game server start.....")
 
+	go enablePprofServer()
+
 	r.Run(":8448")
+}
+
+func enablePprofServer() {
+	http.ListenAndServe("localhost:6060", nil)
 }

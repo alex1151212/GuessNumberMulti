@@ -22,7 +22,7 @@ type Player struct {
 // 監聽 player.Socket.ReadMessage()
 func (player *Player) Read(gameServer *GameServer) {
 	defer func() {
-		_ = player.Socket.Close()
+		gameServer.Unregister <- player
 	}()
 	for {
 		_, message, err := player.Socket.ReadMessage()
@@ -40,7 +40,7 @@ func (player *Player) Read(gameServer *GameServer) {
 // 監聽 Player.Send
 func (player *Player) Write(gameServer *GameServer) {
 	defer func() {
-		_ = player.Socket.Close()
+		gameServer.Unregister <- player
 	}()
 
 	for {
@@ -109,11 +109,21 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 		return
 	case messageType.PLAYING:
 
+		var ok bool
+
 		number := data.Data.(map[string]interface{})["value"].(string)
 
-		game := gameServer.Game[*player.GameId]
+		if player.GameId == nil {
+			return
+		}
 
-		ok := utils.ValidateNumber(number)
+		game, ok := gameServer.Game[*player.GameId]
+
+		if !ok {
+			return
+		}
+
+		ok = utils.ValidateNumber(number)
 		// 輸入無效值
 		if !ok {
 			player.Send <- utils.RespErrorMessage(utils.ErrorRespType{

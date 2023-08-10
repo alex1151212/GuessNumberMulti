@@ -41,16 +41,21 @@ func (gameServer *GameServer) Init() {
 		case conn := <-gameServer.Unregister:
 
 			if _, ok := gameServer.Players[conn.Id]; ok {
-				gameId := conn.GameId
 
-				close(conn.Send)
-				delete(gameServer.Players, conn.Id)
+				gameId := conn.GameId
 
 				if gameId != nil {
 					gameServer.Game[*conn.GameId].LeaveGame(conn)
 				}
 
+				close(conn.Send)
+				delete(gameServer.Players, conn.Id)
+
+				conn.Socket.Close()
+				conn = nil
+
 			}
+
 		case game := <-gameServer.GameNew:
 			gameServer.createGame(game)
 
