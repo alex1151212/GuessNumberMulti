@@ -15,15 +15,15 @@ import (
 
 var gameServer = models.GameServer{
 	Game:       make(map[string]*models.Game),
-	Broadcast:  make(chan []byte),
+	Broadcast:  make(chan []byte, 1),
 	Register:   make(chan *models.Player),
 	Unregister: make(chan *models.Player),
 	Players:    make(map[string]*models.Player),
+	GameNew:    make(chan string),
+	GameEnd:    make(chan *models.Game),
 }
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024 * 1024 * 1024,
-	WriteBufferSize: 1024 * 1024 * 1024,
 	//Solving cross-domain problems
 	CheckOrigin: func(r *http.Request) bool {
 		return true
@@ -50,23 +50,30 @@ func GameHandler(c *gin.Context) {
 	go player.Read(&gameServer)
 
 	go player.Write(&gameServer)
+
 }
+
+/*
+測試用 API
+*/
 
 func CreateGame(c *gin.Context) {
 
 	gameId, _ := c.Params.Get("gameId")
-	game := gameServer.Game[gameId]
+	game, ok := gameServer.Game[gameId]
 
-	if game == nil {
+	if !ok {
 		gameServer.Game[gameId] = &models.Game{
-			Id:          gameId,
-			Players:     make([]*models.Player, 0),
+			Id:          &gameId,
+			Players:     make(map[string]*models.Player),
 			CurrentTurn: nil,
 			Winner:      nil,
 			Status:      gameStatusType.WAITING,
+			Broadcast:   make(chan []byte, 1),
 		}
+		game = gameServer.Game[gameId]
 	}
-
+	game.Init()
 	var gameList = make(map[string]*utils.GameRoomRespType)
 	for k, v := range gameServer.Game {
 		gameList[k] = &utils.GameRoomRespType{
@@ -123,12 +130,12 @@ func JoinGame(c *gin.Context) {
 
 	game := gameServer.Game[gameId]
 
-	game.Players = append(game.Players, gameServer.Players[playerId])
-	gameServer.Players[playerId].GameId = gameId
+	game.JoinGame(gameServer.Players[playerId])
+	gameServer.Players[playerId].GameId = &gameId
 
 	if len(game.Players) == 2 {
 		game.Init()
-		gameServer.SendGamePlayers(gameId, utils.Resp("Game Start"), nil)
+		gameServer.Game[*game.Id].Broadcast <- utils.Resp("Game Start")
 	}
 
 	c.JSON(http.StatusOK, gin.H{
