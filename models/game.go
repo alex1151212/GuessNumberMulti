@@ -17,24 +17,73 @@ type Game struct {
 	Status      gameStatusType.GameStatusType
 
 	// 玩家管理頻道
+	Join      chan *Player
+	Leave     chan *Player
 	Broadcast chan []byte
 }
 
 var GAEM_MAX_PLAYER_AMOUNT = 2
 
-func (game *Game) Init() {
+func (game *Game) Init(gameServer *GameServer) {
 	game.Status = gameStatusType.WAITING
 
-	go game.gamePlayerHandler()
+	go game.gamePlayerHandler(gameServer)
 }
 
-func (game *Game) gamePlayerHandler() {
+func (game *Game) gamePlayerHandler(gameServer *GameServer) {
 	for {
 		select {
 		case message := <-game.Broadcast:
 			for _, player := range game.Players {
 				player.Send <- message
 			}
+		case player := <-game.Join:
+			game.Players[player.Id] = player
+
+			// 遊戲已滿
+			if len(game.Players) >= 2 {
+
+				player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
+					Code:    1003,
+					Message: "The Game Room is Full",
+				})
+				return
+			}
+
+			// 嘗試重複新增同樣的玩家
+			for _, gamePlayer := range game.Players {
+				if gamePlayer.Id == player.Id {
+					player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
+						Code:    1002,
+						Message: "The Game Already Exist this Player",
+					})
+					return
+				}
+			}
+
+			game.Players[player.Id] = player
+
+			// 開始遊戲判斷
+			if len(game.Players) == 2 {
+				player.Send <- utils.RespMessage(messageType.GAME_START, nil)
+				game.startGame()
+				for _, player := range game.Players {
+					player.Status = playerStatusType.PLAYING
+				}
+			} else {
+				player.Status = playerStatusType.WAITING_START
+			}
+		case player := <-game.Leave:
+			delete(game.Players, player.Id)
+
+			if len(game.Players) <= 0 {
+				gameServer.GameEnd <- game
+			}
+			gameRespData := gameServer.getGames()
+
+			gameServer.SendInLobbyPlayers(utils.RespMessage(
+				messageType.GET_GAMES, gameRespData,
+			))
 		}
 	}
 }
@@ -51,50 +100,6 @@ func (game *Game) startGame() {
 
 	game.Status = gameStatusType.START
 	game.initCurrentRound()
-}
-
-func (game *Game) JoinGame(player *Player) {
-
-	// 遊戲已滿
-	if len(game.Players) >= 2 {
-
-		player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
-			Code:    1003,
-			Message: "The Game Room is Full",
-		})
-		return
-	}
-
-	// 嘗試重複新增同樣的玩家
-	for _, gamePlayer := range game.Players {
-		if gamePlayer.Id == player.Id {
-			player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
-				Code:    1002,
-				Message: "The Game Already Exist this Player",
-			})
-			return
-		}
-	}
-
-	game.Players[player.Id] = player
-	player.GameId = game.Id
-
-	// 開始遊戲判斷
-	if len(game.Players) == 2 {
-		player.Send <- utils.RespMessage(messageType.GAME_START, nil)
-		game.startGame()
-		for _, player := range game.Players {
-			player.Status = playerStatusType.PLAYING
-		}
-	} else {
-		player.Status = playerStatusType.WAITING_START
-	}
-}
-func (game *Game) LeaveGame(player *Player) {
-	delete(game.Players, player.Id)
-	player.GameId = nil
-	player.Status = playerStatusType.INLOBBY
-	game.Broadcast <- utils.Resp("Opponent Leave. ")
 }
 
 // 遊戲邏輯
@@ -144,7 +149,7 @@ func (game *Game) GameHandler(gameServer *GameServer, number string, player *Pla
 			game.Status = gameStatusType.NORMAL_END
 
 			for _, player := range game.Players {
-				player.GameId = nil
+				player.Game = nil
 			}
 		}
 		if game.Status == gameStatusType.NORMAL_END {
@@ -172,7 +177,7 @@ func calculateGameResult(game *Game, player *Player, number string) (a int, b in
 	// 取得對手答案
 	for _, client := range game.Players {
 		if client != player {
-			strAnswerList := strings.Split(client.Answer, "")
+			strAnswerList := strings.Split(*client.Answer, "")
 			for index, item := range strAnswerList {
 				answer[index] = item
 			}

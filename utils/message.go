@@ -16,6 +16,9 @@ type GameRoomDataType struct {
 type CreateGameDataType struct {
 	GameId string `json:"gameId,omitempty"`
 }
+type InputGameAnswerDataType struct {
+	GameAnswer string `json:"answer"`
+}
 type PlayingDataType struct {
 	Value string          `json:"value,omitempty"`
 	Resp  PlayingRespType `json:"resp,omitempty"`

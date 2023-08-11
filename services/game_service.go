@@ -35,7 +35,6 @@ func GameServerStart() {
 }
 
 func GameHandler(c *gin.Context) {
-	number, _ := c.Params.Get("number")
 
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -43,7 +42,7 @@ func GameHandler(c *gin.Context) {
 		return
 	}
 
-	player := &models.Player{Id: uuid.Must(uuid.NewV4(), nil).String(), Socket: conn, Send: make(chan []byte), Answer: number}
+	player := &models.Player{Id: uuid.Must(uuid.NewV4(), nil).String(), Socket: conn, Send: make(chan []byte), Answer: nil}
 
 	gameServer.Register <- player
 
@@ -73,7 +72,7 @@ func CreateGame(c *gin.Context) {
 		}
 		game = gameServer.Game[gameId]
 	}
-	game.Init()
+	game.Init(&gameServer)
 	var gameList = make(map[string]*utils.GameRoomRespType)
 	for k, v := range gameServer.Game {
 		gameList[k] = &utils.GameRoomRespType{
@@ -130,11 +129,11 @@ func JoinGame(c *gin.Context) {
 
 	game := gameServer.Game[gameId]
 
-	game.JoinGame(gameServer.Players[playerId])
-	gameServer.Players[playerId].GameId = &gameId
+	gameServer.Players[playerId].JoinGame(game)
+	gameServer.Players[playerId].Game = game
 
 	if len(game.Players) == 2 {
-		game.Init()
+		game.Init(&gameServer)
 		gameServer.Game[*game.Id].Broadcast <- utils.Resp("Game Start")
 	}
 

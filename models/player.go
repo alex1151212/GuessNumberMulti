@@ -14,9 +14,9 @@ type Player struct {
 	Id     string
 	Socket *websocket.Conn
 	Send   chan []byte
-	Answer string
+	Answer *string
 	Status playerStatusType.PlayerStatusType
-	GameId *string
+	Game   *Game
 }
 
 // 監聽 player.Socket.ReadMessage()
@@ -94,32 +94,34 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 	case messageType.GET_PLAYERS:
 		break
 	case messageType.JOIN_GAME:
+		if player.Answer != nil {
+			gameId := data.Data.(map[string]interface{})["gameId"].(string)
 
-		gameId := data.Data.(map[string]interface{})["gameId"].(string)
+			if game := gameServer.Game[gameId]; game != nil {
+				player.JoinGame(game)
 
-		if game := gameServer.Game[gameId]; game != nil {
-			gameServer.Game[gameId].JoinGame(player)
+				gameRespData := gameServer.getGames()
 
-			gameRespData := gameServer.getGames()
-
-			jsonData := utils.RespMessage(messageType.GET_GAMES, gameRespData)
-			gameServer.SendInLobbyPlayers(jsonData)
+				jsonData := utils.RespMessage(messageType.GET_GAMES, gameRespData)
+				gameServer.SendInLobbyPlayers(jsonData)
+			}
 		}
-
-		return
+	case messageType.INPUT_GAMEANSWER:
+		gameAnswer := data.Data.(map[string]interface{})["gameAnswer"].(string)
+		player.Answer = &gameAnswer
 	case messageType.PLAYING:
 
 		var ok bool
 
 		number := data.Data.(map[string]interface{})["value"].(string)
 
-		if player.GameId == nil {
+		if player.Game == nil {
 			return
 		}
 
-		game, ok := gameServer.Game[*player.GameId]
+		game := player.Game
 
-		if !ok {
+		if game != nil {
 			return
 		}
 
@@ -134,22 +136,35 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 
 		game.GameHandler(gameServer, number, player)
 	case messageType.LEAVE_GAME:
-		game := gameServer.Game[*player.GameId]
-		game.LeaveGame(player)
-		if len(game.Players) <= 0 {
-			gameServer.GameEnd <- game
+		if player.Game != nil {
+			game := player.Game
+
+			player.LeaveGame(game)
+
+			if len(game.Players) <= 0 {
+				gameServer.GameEnd <- game
+			}
+			gameRespData := gameServer.getGames()
+
+			gameServer.SendInLobbyPlayers(utils.RespMessage(
+				messageType.GET_GAMES, gameRespData,
+			))
 		}
-
-		gameRespData := gameServer.getGames()
-
-		gameServer.SendInLobbyPlayers(utils.RespMessage(
-			messageType.GET_GAMES, gameRespData,
-		))
-
 	case messageType.DELETE_GAME:
 		gameId := data.Data.(map[string]interface{})["gameId"].(string)
 		fmt.Println(gameId)
 		// delete(gameServer.Game, gameId)
 	}
 
+}
+
+func (player *Player) JoinGame(game *Game) {
+	player.Game = game
+
+}
+func (player *Player) LeaveGame(game *Game) {
+	player.Game = nil
+	player.Answer = nil
+	player.Status = playerStatusType.INLOBBY
+	game.Broadcast <- utils.Resp("Opponent Leave. ")
 }

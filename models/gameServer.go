@@ -40,12 +40,12 @@ func (gameServer *GameServer) Init() {
 
 		case conn := <-gameServer.Unregister:
 
-			if _, ok := gameServer.Players[conn.Id]; ok {
+			if player, ok := gameServer.Players[conn.Id]; ok {
 
-				gameId := conn.GameId
+				gameId := conn.Game
 
 				if gameId != nil {
-					gameServer.Game[*conn.GameId].LeaveGame(conn)
+					player.LeaveGame(gameId)
 				}
 
 				close(conn.Send)
@@ -78,15 +78,6 @@ func (gameServer *GameServer) Init() {
 				conn.Send <- message
 			}
 
-		}
-	}
-}
-
-// 發送給指定遊戲內的指定玩家
-func (gameServer *GameServer) SendGamePlayer(message []byte, player *Player) {
-	for _, conn := range gameServer.Game[*player.GameId].Players {
-		if conn == player {
-			conn.Send <- message
 		}
 	}
 }
@@ -137,7 +128,7 @@ func (gameServer *GameServer) createGame(gameId string) {
 			Broadcast:   make(chan []byte, 1),
 		}
 		game = gameServer.Game[gameId]
-		game.Init()
+		game.Init(gameServer)
 	}
 
 	var gameList = make(map[string]*utils.GameRoomRespType)
