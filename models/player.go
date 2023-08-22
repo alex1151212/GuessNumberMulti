@@ -97,6 +97,15 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 		gameAnswer := data.Data.(map[string]interface{})["gameAnswer"].(string)
 		player.Answer = &gameAnswer
 
+		ok := utils.ValidateNumber(*player.Answer)
+		// 輸入無效值
+		if !ok {
+			player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
+				Code:    1001,
+				Message: "invalid input",
+			})
+		}
+
 		if player.Answer != nil {
 			gameId := data.Data.(map[string]interface{})["gameId"].(string)
 
@@ -120,6 +129,7 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 		}
 
 		ok = utils.ValidateNumber(number)
+		fmt.Println(ok)
 		// 輸入無效值
 		if !ok {
 			player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
