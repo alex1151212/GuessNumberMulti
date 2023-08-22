@@ -29,7 +29,7 @@ func main() {
 
 	go services.GameServerStart()
 
-	r.GET("/ws/:number", services.GameHandler)
+	r.GET("/ws", services.GameHandler)
 
 	r.GET("/create/game/:gameId", services.CreateGame)
 	r.GET("/join/game/:gameId/:playerId", services.JoinGame)
