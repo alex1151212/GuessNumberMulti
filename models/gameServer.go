@@ -116,7 +116,7 @@ func (gameServer *GameServer) getGames() map[string]*utils.GameRoomRespType {
 
 func (gameServer *GameServer) createGame(gameId string) {
 
-	game, ok := gameServer.Game[gameId]
+	_, ok := gameServer.Game[gameId]
 
 	if !ok {
 		gameServer.Game[gameId] = &Game{
@@ -126,9 +126,10 @@ func (gameServer *GameServer) createGame(gameId string) {
 			Winner:      nil,
 			Status:      gameStatusType.WAITING,
 			Broadcast:   make(chan []byte, 1),
+			Join:        make(chan *Player, 1),
+			Leave:       make(chan *Player, 1),
 		}
-		game = gameServer.Game[gameId]
-		game.Init(gameServer)
+		gameServer.Game[gameId].Init(gameServer)
 	}
 
 	var gameList = make(map[string]*utils.GameRoomRespType)

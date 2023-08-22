@@ -94,10 +94,14 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 	case messageType.GET_PLAYERS:
 		break
 	case messageType.JOIN_GAME:
+		gameAnswer := data.Data.(map[string]interface{})["gameAnswer"].(string)
+		player.Answer = &gameAnswer
+
 		if player.Answer != nil {
 			gameId := data.Data.(map[string]interface{})["gameId"].(string)
 
 			if game := gameServer.Game[gameId]; game != nil {
+				game.Join <- player
 				player.JoinGame(game)
 
 				gameRespData := gameServer.getGames()
@@ -106,26 +110,21 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 				gameServer.SendInLobbyPlayers(jsonData)
 			}
 		}
-	case messageType.INPUT_GAMEANSWER:
-		gameAnswer := data.Data.(map[string]interface{})["gameAnswer"].(string)
-		player.Answer = &gameAnswer
+
 	case messageType.PLAYING:
 
 		var ok bool
 
 		number := data.Data.(map[string]interface{})["value"].(string)
 
-		if player.Game == nil {
-			return
-		}
-
 		game := player.Game
 
-		if game != nil {
+		if game == nil {
 			return
 		}
 
 		ok = utils.ValidateNumber(number)
+		fmt.Println(ok)
 		// 輸入無效值
 		if !ok {
 			player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
@@ -141,9 +140,8 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 
 			player.LeaveGame(game)
 
-			if len(game.Players) <= 0 {
-				gameServer.GameEnd <- game
-			}
+			game.Leave <- player
+
 			gameRespData := gameServer.getGames()
 
 			gameServer.SendInLobbyPlayers(utils.RespMessage(
@@ -160,6 +158,7 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 
 func (player *Player) JoinGame(game *Game) {
 	player.Game = game
+	player.Status = playerStatusType.WAITING_START
 
 }
 func (player *Player) LeaveGame(game *Game) {

@@ -38,17 +38,6 @@ func (game *Game) gamePlayerHandler(gameServer *GameServer) {
 				player.Send <- message
 			}
 		case player := <-game.Join:
-			game.Players[player.Id] = player
-
-			// 遊戲已滿
-			if len(game.Players) >= 2 {
-
-				player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
-					Code:    1003,
-					Message: "The Game Room is Full",
-				})
-				return
-			}
 
 			// 嘗試重複新增同樣的玩家
 			for _, gamePlayer := range game.Players {
@@ -63,22 +52,31 @@ func (game *Game) gamePlayerHandler(gameServer *GameServer) {
 
 			game.Players[player.Id] = player
 
-			// 開始遊戲判斷
-			if len(game.Players) == 2 {
-				player.Send <- utils.RespMessage(messageType.GAME_START, nil)
+			switch len(game.Players) {
+			case 1:
+				player.Status = playerStatusType.WAITING_START
+			case 2:
 				game.startGame()
 				for _, player := range game.Players {
+					player.Send <- utils.RespMessage(messageType.GAME_START, nil)
 					player.Status = playerStatusType.PLAYING
 				}
-			} else {
-				player.Status = playerStatusType.WAITING_START
+			default:
+				player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
+					Code:    1003,
+					Message: "The Game Room is Full",
+				})
+				return
 			}
+
 		case player := <-game.Leave:
+
 			delete(game.Players, player.Id)
 
 			if len(game.Players) <= 0 {
 				gameServer.GameEnd <- game
 			}
+
 			gameRespData := gameServer.getGames()
 
 			gameServer.SendInLobbyPlayers(utils.RespMessage(
@@ -100,6 +98,7 @@ func (game *Game) startGame() {
 
 	game.Status = gameStatusType.START
 	game.initCurrentRound()
+
 }
 
 // 遊戲邏輯
@@ -108,6 +107,7 @@ func (game *Game) GameHandler(gameServer *GameServer, number string, player *Pla
 	var a, b int
 	var valid bool
 	var respA, respB string
+
 	if game.Status == gameStatusType.START {
 
 		if game.CurrentTurn == player {
@@ -149,7 +149,8 @@ func (game *Game) GameHandler(gameServer *GameServer, number string, player *Pla
 			game.Status = gameStatusType.NORMAL_END
 
 			for _, player := range game.Players {
-				player.Game = nil
+				player.LeaveGame(game)
+				game.Leave <- player
 			}
 		}
 		if game.Status == gameStatusType.NORMAL_END {
