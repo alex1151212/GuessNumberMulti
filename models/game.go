@@ -69,6 +69,11 @@ func (game *Game) gamePlayerHandler(gameServer *GameServer) {
 				return
 			}
 
+			gameRespData := gameServer.getGames()
+
+			jsonData := utils.RespMessage(messageType.GET_GAMES, gameRespData)
+			gameServer.SendInLobbyPlayers(jsonData)
+
 		case player := <-game.Leave:
 
 			delete(game.Players, player.Id)
@@ -148,10 +153,6 @@ func (game *Game) GameHandler(gameServer *GameServer, number string, player *Pla
 			game.Winner = player
 			game.Status = gameStatusType.NORMAL_END
 
-			for _, player := range game.Players {
-				player.LeaveGame(game)
-				game.Leave <- player
-			}
 		}
 		if game.Status == gameStatusType.NORMAL_END {
 			respMessage := utils.RespMessage(
@@ -165,6 +166,11 @@ func (game *Game) GameHandler(gameServer *GameServer, number string, player *Pla
 			game.Broadcast <- respMessage
 
 			gameServer.GameEnd <- game
+
+			for _, player := range game.Players {
+				player.LeaveGame(game)
+				game.Leave <- player
+			}
 
 			return
 		}

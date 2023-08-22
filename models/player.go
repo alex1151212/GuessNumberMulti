@@ -104,10 +104,6 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 				game.Join <- player
 				player.JoinGame(game)
 
-				gameRespData := gameServer.getGames()
-
-				jsonData := utils.RespMessage(messageType.GET_GAMES, gameRespData)
-				gameServer.SendInLobbyPlayers(jsonData)
 			}
 		}
 
@@ -124,7 +120,6 @@ func messageHandler(player *Player, gameServer *GameServer, message []byte) {
 		}
 
 		ok = utils.ValidateNumber(number)
-		fmt.Println(ok)
 		// 輸入無效值
 		if !ok {
 			player.Send <- utils.RespErrorMessage(utils.ErrorRespType{
